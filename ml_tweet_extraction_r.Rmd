@@ -71,20 +71,20 @@ Options 1 and 2 (I chose the latter to skip connecting to Twitter API).
 
 ```{r tweet extraction}
 #Option 1
-#searchTwitter("nba", n=3, lang="en")
-#devtools::install_github("mkearney/rtweet@HEAD")
-#devtools::install_github("mkearney/rtweet")
+searchTwitter("nba", n=3, lang="en")
+devtools::install_github("mkearney/rtweet@HEAD")
+devtools::install_github("mkearney/rtweet")
 library(rtweet)
-#library(rtools)
+library(rtools)
 
-#install.packages("jsonlite", type = "source")
+install.packages("jsonlite", type = "source")
 
-#appname <- "RTTtracker"
-#key <- "xxxx"
-#secret <- "xxxx
+appname <- "RTTtracker"
+key <- "xxxx"
+secret <- "xxxx
 
-#twitter_token <- create_token(app = appname, 
- #  consumer_key = key, consumer_secret = secret) 
+twitter_token <- create_token(app = appname, 
+   consumer_key = key, consumer_secret = secret) 
 
 #Option 2 #I used this option to retrieve my tweets.
 
