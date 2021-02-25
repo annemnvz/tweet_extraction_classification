@@ -27,66 +27,13 @@ The aim of this tutorial is to obtain a set of tweets from the Twitter app and c
 
 # Retrieving Twitter data
 
-I figured that there are two different options for extracting tweets from the Twitter app. One is with the package "twitteR" and the other with "rtweet". The first one seemed more complicated to me as it requires an API account creation in Twitter, whereas the second directly obtains tweets from the APP after logging into your personal account. Therefore I decided to use the second option with "rtweet". However, I decided to keep the information of both and the path I followed in hashtag comments until the retrieval of the data.
-
-## Setting up Twitter authentication
-
-https://randerson112358.medium.com/twitter-mining-with-r-6fef0dd97781
-
-```{r Twitter setup}
-install.packages("twitteR") #option 1
-library("twitteR")
-install.packages("rtweet") #option 2
-library(rtweet)
-
-
-~#consumerKey=’XXXXXXXXXXXXXXXXXXXXXXXX’
-#consumerSecret=’XXXXXXXXXXXXXXXXXXXXXX’
-#accessToken=’XXXXXXXXXXXXXXXXXXXX’
-#accessTokenSecret= ‘XXXXXXXXXXXXXXXXXXXXXXXXXX
-
-
-#This is only for option 1. I chose option 2 (see below)
-create_token(app = "mytwitterapp",
-             consumer_key,
-             consumer_secret,
-             access_token = NULL,
-             access_secret = NULL,
-             set_renv = TRUE
-             )
-```
-
-## Connecting to Twitter
-
-This is only for the first method with TwitteR package. Because I decided to use rtweet, I will skip this connecting to Twitter API part.
-
-```{r connecting Twitter}
-#library(base64enc)
-#setup_twitter_oauth(consumerKey,consumerSecret,accessToken,accessTokenSecret)
-```
+I figured that there are two different options for extracting tweets from the Twitter app. One is with the package "twitteR" and the other with "rtweet". The first one seemed more complicated to me as it requires an API account creation in Twitter, whereas the second directly obtains tweets from the APP after logging into your personal account. Therefore I decided to use the second option with "rtweet". 
 
 ## Extracting tweets
 
 Options 1 and 2 (I chose the latter to skip connecting to Twitter API).
 
 ```{r tweet extraction}
-#Option 1
-searchTwitter("nba", n=3, lang="en")
-devtools::install_github("mkearney/rtweet@HEAD")
-devtools::install_github("mkearney/rtweet")
-library(rtweet)
-library(rtools)
-
-install.packages("jsonlite", type = "source")
-
-appname <- "RTTtracker"
-key <- "xxxx"
-secret <- "xxxx
-
-twitter_token <- create_token(app = appname, 
-   consumer_key = key, consumer_secret = secret) 
-
-#Option 2 #I used this option to retrieve my tweets.
 
 climatetweets <- search_tweets(q = "#ClimateEmergency",
                                n = 1000,
@@ -115,20 +62,14 @@ print(sample)
 
 # Creating the data set
 
-## Install and Load R packages
-
-```{r package loading}
-library(tidytext)
-library(knitr)
-library(kableExtra)
-```
-
-
-## Organizing the data
+## Organizing and visualizing the data
 
 The two datasets Ihave created after the Twitter "web scraping" on the #ClimateEmergency and #Immigration hashtags contain a set of rows with different information such as user names, date created, id, retweets, screen names, etc. I now clean up the data to keep only two columns: the first column is the text of the tweet and the second one contains a set of hashtags, out of which one is the class. In addition, I continue cleaning the data a bit more and remove all the hashtags to keep only that class one. Finally, I combine both datasets into the same one. I will export it to a CSV document to then continue working with it and further clean up tweet data.
 
 ```{r dataset}
+library(tidytext)
+library(knitr)
+library(kableExtra)
 
 climate <- climatetweets %>% select(text, hashtags)
 immigration <- immigrationtweets %>% select(text, hashtags)
@@ -159,8 +100,8 @@ head(data, 3)
 
 write_as_csv(climate1, "climate.csv") #climate dataset
 write_as_csv(immigration1, "immigration.csv") #immigration dataset
-#write_as_csv(data, "twitterdata.csv") #unclean data, I won't save this
-write_as_csv(data, "twitterdata.csv") #whole dataset
+
+write_as_csv(data, "twitterdata.csv") #complete dataset
 #write.csv(data,'twitterdata.csv')
 
 ```
@@ -199,9 +140,9 @@ stargazer::stargazer(data, type = "html",
 ```
 
 ## More advanced visualization of initial data:
-These graphs below are aimed to just show the distribution of our data which we already knew was balanced but well, not bad to see it. It shows how both classes have 1000 tweets (rows) each, as we already knew.
+These graphs below are aimed to just show the distribution of our data which we already knew was balanced but, well, not bad to see it. It shows how both classes have 1000 tweets (rows) each, as we already knew. In addition, as we can see in this rainbow colored ggplots, the data is very well distributed.
 
-In addition, as we can see in this rainbow colored ggplots, the data is very well distributed.
+This step will be more useful in cases where there are more classes or data is unbalanced.
 
 ```{r visualizing data - barplot}
 library(ggplot2) #loading this package for fancy data visualization
@@ -230,9 +171,7 @@ bar + coord_polar()
 # Data text mining
 
 ## Text mining package
-In this section I dive into the actual text mining process. I begin by loading in a few packages first, such as the text mining library. Then, I start performing the deeper text data cleaning process. 
-
-In this process I perform different operations on my data using the tm package of r, such as removing punctuation, numbers and white spaces, converting all text to lowercase or remove English stopwords that is not insightful for our analysis such as "the", "a" or "and". I also remove all the necessary punctuation and all the characters that will difficult the classification later on such as hashtags, @ mention symbols, URLs, emojis, and so on. To conclude, I stem words using the Snowball stemming algorithm.
+In this section I dive into the actual text mining/data cleaning process. In this process I perform different operations on my data using the tm package of r, such as removing punctuation, numbers and white spaces, converting all text to lowercase or remove English stopwords that is not insightful for our analysis such as "the", "a" or "and". I also remove all the necessary punctuation and all the characters that will difficult the classification later on such as hashtags, @ mention symbols, URLs, emojis, and so on. To conclude, I stem words using the Snowball stemming algorithm.
 
 ```{r text mining tweet cleanup}
 library(NLP)
@@ -277,19 +216,6 @@ text = stemDocument(text)
 cor = Corpus(VectorSource(text))            # Create text corpus
 cor
 inspect(cor[1:3]) #inspecting first three elements of the corpus
-
-
-#convert data to UTF #I didn't do this because it doesn't apply tpo my data
-#cdata <- iconv(data$text, "ASCII", "UTF-8", sub="")
-
-#cdata <- VCorpus(VectorSource(data),readerControl=list(language="en"))
-
-#I am not sure if this is the same but the following line (obtained from
-#tm textprocessing Tutorial of our course) is not working for me.
-
-#cdata = VCorpus(DirSource("twitterdata"),readerControl=list(language="en")
-
-
 ```
 
 ## Document-term matrix from corpus
@@ -341,7 +267,7 @@ typeof(datamatrix)  # what is it?
 length(datamatrix)  # how long is it? What about two dimensional objects?
 attributes(datamatrix)  # does it have any metadata?
 
-#cdata.dtm.50=removeSparseTerms(cdata.dtm,sparse=0.5) #Just trying things
+#cdata.dtm.50=removeSparseTerms(cdata.dtm,sparse=0.5) #Just trying different sparseness levels.
 #cdata.dtm.65=removeSparseTerms(cdata.dtm,sparse=0.65)
 ```
 
@@ -580,5 +506,5 @@ table(TestPred, testing$type,dnn=c("Prediction","Actual"))
 
 In this project I have learned how to retrieve tweets directly from the Twitter app and convert them into datasets. In addition, I have learned how to clean and process this data by means of the tm R package and some other packages, as well as visualizing the data and obtaining different sparseness levels. To conclude, I have been able to try different ML classifying algorithms with my data, including Decision Tree and Naive Bayes algorithms, to then interpret results from prediction table matrix.
 
-Results make me think that the analysis might have some errors and that is why both algorithms are similar. I believe that the sparness level might have been too high, even if I tried to adjust in many times to control this. However, I would like to conclude the project by saying that, despite the errors, I believe this was a good introduction to how to work with data in R and perform some basic Machine Learning operations and algorithms.
+Results indicate that the analysis has some errors and that is why both algorithms are similar. I believe that perhaps the main reason is that the sparness level is too high. However, I would like to conclude the project by saying that, despite the errors, I believe this was a good introduction to how to work with data in R and perform some basic Machine Learning operations and algorithms.
 
