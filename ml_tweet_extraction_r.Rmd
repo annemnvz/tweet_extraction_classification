@@ -34,8 +34,8 @@ I figured that there are two different options for extracting tweets from the Tw
 https://randerson112358.medium.com/twitter-mining-with-r-6fef0dd97781
 
 ```{r Twitter setup}
-#install.packages("twitteR") #option 1
-#library("twitteR")
+install.packages("twitteR") #option 1
+library("twitteR")
 install.packages("rtweet") #option 2
 library(rtweet)
 
@@ -67,12 +67,7 @@ This is only for the first method with TwitteR package. Because I decided to use
 
 ## Extracting tweets
 
-I was having an error knitting the document with the search_tweet function. It is related to having tokens from user: 
-"Requesting token on behalf of user...
-Quitting from lines 95-112 (ml_twitter_classificationdraft2AM_23-02-21.Rmd) 
-Error: API user token required. see http://rtweet.info/articles/auth.html for instructions
-Execution halted"
-I tried many things but it would not work. Because this was giving me issues, I decided to just keep this section in hashtag comments.
+Options 1 and 2 (I chose the latter to skip connecting to Twitter API).
 
 ```{r tweet extraction}
 #Option 1
@@ -93,29 +88,29 @@ library(rtweet)
 
 #Option 2 #I used this option to retrieve my tweets.
 
-#climatetweets <- search_tweets(q = "#ClimateEmergency",
-#                               n = 1000,
-#                               include_rts = FALSE,
-#                               `-filter` = "replies",
-#                               lang = "en", token = twitter_token)
+climatetweets <- search_tweets(q = "#ClimateEmergency",
+                               n = 1000,
+                               include_rts = FALSE,
+                               `-filter` = "replies",
+                               lang = "en", token = twitter_token)
 
-#immigrationtweets <- search_tweets(q = "#Immigration", 
-#                        n = 1000,
-#                        include_rts = FALSE,
-#                        `-filter` = "replies",
-#                        lang = "en", token = twitter_token)
-#
+immigrationtweets <- search_tweets(q = "#Immigration", 
+                        n = 1000,
+                        include_rts = FALSE,
+                        `-filter` = "replies",
+                        lang = "en", token = twitter_token)
+
 ```
 
 ## Sample of retrieved tweets
 
 ```{r sample of tweets}
-#library(tidyverse) 
+library(tidyverse) 
 
-#sample <- climatetweets %>% 
-#  sample_n(5) %>%
-#  select(created_at, screen_name, text, favorite_count, retweet_count)
-#print(sample)
+sample <- climatetweets %>% 
+  sample_n(5) %>%
+  select(created_at, screen_name, text, favorite_count, retweet_count)
+print(sample)
 ```
 
 # Creating the data set
@@ -124,39 +119,37 @@ library(rtweet)
 
 ```{r package loading}
 library(tidytext)
-#update.packages(ask = FALSE)
-#install.packages('knitr', dependencies = TRUE)
 library(knitr)
 library(kableExtra)
 ```
 
 
-## Cleaning the data
+## Organizing the data
 
 The two datasets Ihave created after the Twitter "web scraping" on the #ClimateEmergency and #Immigration hashtags contain a set of rows with different information such as user names, date created, id, retweets, screen names, etc. I now clean up the data to keep only two columns: the first column is the text of the tweet and the second one contains a set of hashtags, out of which one is the class. In addition, I continue cleaning the data a bit more and remove all the hashtags to keep only that class one. Finally, I combine both datasets into the same one. I will export it to a CSV document to then continue working with it and further clean up tweet data.
 
 ```{r dataset}
 
-#climate <- climatetweets %>% select(text, hashtags)
-#immigration <- immigrationtweets %>% select(text, hashtags)
+climate <- climatetweets %>% select(text, hashtags)
+immigration <- immigrationtweets %>% select(text, hashtags)
 
-#colnames(climate)[2] <- "class"
-#colnames(immigration)[2] <- "class"
+colnames(climate)[2] <- "class"
+colnames(immigration)[2] <- "class"
 
-#below I'm just replicating the data just in case not to lose information
-#climate1 <- climate 
-#immigration1 <- immigration
+below I'm just replicating the data just in case not to lose information
+climate1 <- climate 
+immigration1 <- immigration
 
-#climate1$class <- "climateemergency"
-#immigration1$class <- "immigration"
+climate1$class <- "climateemergency"
+immigration1$class <- "immigration"
 
-#head(climate1, 3)
-#head(immigration1, 3)
+head(climate1, 3)
+head(immigration1, 3)
 
-#combining datasets
-#data <- rbind(climate1,immigration1)
+combining datasets
+data <- rbind(climate1,immigration1)
 
-#head(data, 3)
+head(data, 3)
 ```
 
 
@@ -164,11 +157,10 @@ The two datasets Ihave created after the Twitter "web scraping" on the #ClimateE
 
 ```{r CSV with tweet information}
 
-#write_as_csv(climate1, "climate.csv") #climate dataset
-#write_as_csv(immigration1, "immigration.csv") #immigration dataset
+write_as_csv(climate1, "climate.csv") #climate dataset
+write_as_csv(immigration1, "immigration.csv") #immigration dataset
 #write_as_csv(data, "twitterdata.csv") #unclean data, I won't save this
-#write.csv(data,'twitterdata.csv')
-#write_as_csv(data, "twitterdata.csv") #whole dataset
+write_as_csv(data, "twitterdata.csv") #whole dataset
 #write.csv(data,'twitterdata.csv')
 
 ```
@@ -179,12 +171,6 @@ I already have my csv documents with my data slightly cleaned up so, from now on
 
 ```{r import csv}
 #getwd()
-  
-# Required for melt() and cast() function 
-#install.packages("reshape2") 
-#install.packages("reshape") 
-library(reshape2) 
-library(reshape) 
 
 #These are separate data on each topic, no need to load them in general.
 #climate <- read.csv("climate.csv") 
