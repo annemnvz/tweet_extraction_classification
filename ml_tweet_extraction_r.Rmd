@@ -1,0 +1,622 @@
+---
+title: "Tweet classification"
+author: "Anne Manero Alvarez"
+output:
+  html_document:
+    df_print: paged
+    toc: TRUE
+    toc_float: yes
+    theme: cerulean
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, warning = FALSE, error = FALSE, message = FALSE, collaspe = TRUE)
+
+#loadedNamespaces()
+
+#remove.packages("htmltools")
+#install.packages('htmltools')
+
+library(rtweet)
+library(tidyverse)
+library(tidytext)
+library(knitr)
+library(kableExtra)
+library(reshape2) 
+library(reshape) 
+library(stargazer)
+library(ggplot2)
+library(NLP)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+library(caret)
+```
+
+
+# Introduction
+
+The aim of this tutorial is to obtain a set of tweets from the Twitter app and classify them according to two different unrelated topics (classes). I have chosen to look for the hashtags #climateemergency and #immigration, as I consider these two topics to be trending in our society now. The process I carry out for the completion of this project is the following:
+
+1. First, I obtain two different data sets from Twitter for each class and I preprocess the data in order to obtain one single csv document with two columns: one with text and another with the class. The class has only two possible topics: "climateemergency" or "immigration". I obtained 1000 tweets for each hashtag topics, 2000 in total.
+
+2. Second, I employ more specialized text mining techniques for the curation of the text data. In this process I remove English stop words and unnecessary spaces and punctuation, I set all the text in lowerscore and I stem words using SnowBall stemming algorithm. I then have a look at sparsity and remove the least used terms to keep a list of most relevant terms to the class. 
+
+3. Third and last, I start the clustering and classification process. I cluster my data using three different methods: Euclidean, Canberra and hclust. For the classification, I make partitions of the data to obtain the test, cross validation and training sets. I then chose the Naive Bayes and Decision Tree algorithms to perform the classification and analyze the results in the confusion matrix. To conclude, I offer a few notes on what I believe the outcomes may imply.
+
+# Retrieving Twitter data
+
+I figured that there are two different options for extracting tweets from the Twitter app. One is with the package "twitteR" and the other with "rtweet". The first one seemed more complicated to me as it requires an API account creation in Twitter, whereas the second directly obtains tweets from the APP after logging into your personal account. Therefore I decided to use the second option with "rtweet". However, I decided to keep the information of both and the path I followed in hashtag comments until the retrieval of the data.
+
+## Setting up Twitter authentication
+
+https://randerson112358.medium.com/twitter-mining-with-r-6fef0dd97781
+
+```{r Twitter setup}
+#install.packages("twitteR") #option 1
+#library("twitteR")
+install.packages("rtweet") #option 2
+library(rtweet)
+
+
+~#consumerKey=’XXXXXXXXXXXXXXXXXXXXXXXX’
+#consumerSecret=’XXXXXXXXXXXXXXXXXXXXXX’
+#accessToken=’XXXXXXXXXXXXXXXXXXXX’
+#accessTokenSecret= ‘XXXXXXXXXXXXXXXXXXXXXXXXXX
+
+
+#This is only for option 1. I chose option 2 (see below)
+create_token(app = "mytwitterapp",
+             consumer_key,
+             consumer_secret,
+             access_token = NULL,
+             access_secret = NULL,
+             set_renv = TRUE
+             )
+```
+
+## Connecting to Twitter
+
+This is only for the first method with TwitteR package. Because I decided to use rtweet, I will skip this connecting to Twitter API part.
+
+```{r connecting Twitter}
+#library(base64enc)
+#setup_twitter_oauth(consumerKey,consumerSecret,accessToken,accessTokenSecret)
+```
+
+## Extracting tweets
+
+I was having an error knitting the document with the search_tweet function. It is related to having tokens from user: 
+"Requesting token on behalf of user...
+Quitting from lines 95-112 (ml_twitter_classificationdraft2AM_23-02-21.Rmd) 
+Error: API user token required. see http://rtweet.info/articles/auth.html for instructions
+Execution halted"
+I tried many things but it would not work. Because this was giving me issues, I decided to just keep this section in hashtag comments.
+
+```{r tweet extraction}
+#Option 1
+#searchTwitter("nba", n=3, lang="en")
+#devtools::install_github("mkearney/rtweet@HEAD")
+#devtools::install_github("mkearney/rtweet")
+library(rtweet)
+#library(rtools)
+
+#install.packages("jsonlite", type = "source")
+
+#appname <- "RTTtracker"
+#key <- "xxxx"
+#secret <- "xxxx
+
+#twitter_token <- create_token(app = appname, 
+ #  consumer_key = key, consumer_secret = secret) 
+
+#Option 2 #I used this option to retrieve my tweets.
+
+#climatetweets <- search_tweets(q = "#ClimateEmergency",
+#                               n = 1000,
+#                               include_rts = FALSE,
+#                               `-filter` = "replies",
+#                               lang = "en", token = twitter_token)
+
+#immigrationtweets <- search_tweets(q = "#Immigration", 
+#                        n = 1000,
+#                        include_rts = FALSE,
+#                        `-filter` = "replies",
+#                        lang = "en", token = twitter_token)
+#
+```
+
+## Sample of retrieved tweets
+
+```{r sample of tweets}
+#library(tidyverse) 
+
+#sample <- climatetweets %>% 
+#  sample_n(5) %>%
+#  select(created_at, screen_name, text, favorite_count, retweet_count)
+#print(sample)
+```
+
+# Creating the data set
+
+## Install and Load R packages
+
+```{r package loading}
+library(tidytext)
+#update.packages(ask = FALSE)
+#install.packages('knitr', dependencies = TRUE)
+library(knitr)
+library(kableExtra)
+```
+
+
+## Cleaning the data
+
+The two datasets Ihave created after the Twitter "web scraping" on the #ClimateEmergency and #Immigration hashtags contain a set of rows with different information such as user names, date created, id, retweets, screen names, etc. I now clean up the data to keep only two columns: the first column is the text of the tweet and the second one contains a set of hashtags, out of which one is the class. In addition, I continue cleaning the data a bit more and remove all the hashtags to keep only that class one. Finally, I combine both datasets into the same one. I will export it to a CSV document to then continue working with it and further clean up tweet data.
+
+```{r dataset}
+
+#climate <- climatetweets %>% select(text, hashtags)
+#immigration <- immigrationtweets %>% select(text, hashtags)
+
+#colnames(climate)[2] <- "class"
+#colnames(immigration)[2] <- "class"
+
+#below I'm just replicating the data just in case not to lose information
+#climate1 <- climate 
+#immigration1 <- immigration
+
+#climate1$class <- "climateemergency"
+#immigration1$class <- "immigration"
+
+#head(climate1, 3)
+#head(immigration1, 3)
+
+#combining datasets
+#data <- rbind(climate1,immigration1)
+
+#head(data, 3)
+```
+
+
+## Exporting tweets to CSV file
+
+```{r CSV with tweet information}
+
+#write_as_csv(climate1, "climate.csv") #climate dataset
+#write_as_csv(immigration1, "immigration.csv") #immigration dataset
+#write_as_csv(data, "twitterdata.csv") #unclean data, I won't save this
+#write.csv(data,'twitterdata.csv')
+#write_as_csv(data, "twitterdata.csv") #whole dataset
+#write.csv(data,'twitterdata.csv')
+
+```
+
+
+## Importing datasets
+I already have my csv documents with my data slightly cleaned up so, from now on, I will directly just load in the document.
+
+```{r import csv}
+#getwd()
+  
+# Required for melt() and cast() function 
+#install.packages("reshape2") 
+#install.packages("reshape") 
+library(reshape2) 
+library(reshape) 
+
+#These are separate data on each topic, no need to load them in general.
+#climate <- read.csv("climate.csv") 
+#immigration <- read.csv("immigration.csv")
+
+data <- read.csv("twitterdata.csv")
+#for some reason my data loads with an extra column that is saved automatically when saving the document so I remove it using this line:
+data <- subset(data, select = -c(X))
+
+```
+
+## Initial data visualization
+Now that we have obtained our clean dataset, it is time to try a few data visualization techniques and observe what the initial data has to offer. There is still more data mining processes ahead but this is just an inital visualization. 
+
+```{r visualizing data}
+library(stargazer)
+#Visualizing the basics of our data:
+
+ls(data) #our columns are class and text
+dim(data) #this data contains 1992 rows of 2 variables (class and text)
+head(data, n=10) #this lets us take a sneak peek at the data (first 10 rows).
+
+stargazer::stargazer(data, type = "html",
+ title = "Data visualization")
+
+```
+
+## More advanced visualization of initial data:
+These graphs below are aimed to just show the distribution of our data which we already knew was balanced but well, not bad to see it. It shows how both classes have 1000 tweets (rows) each, as we already knew.
+
+In addition, as we can see in this rainbow colored ggplots, the data is very well distributed.
+
+```{r visualizing data - barplot}
+library(ggplot2) #loading this package for fancy data visualization
+
+ggplot(data = data) + 
+  geom_bar(mapping = aes(x = class)) #this just shows the distribution of
+#our data which we already knew was balanced but well, not bad to see it.
+#It shows how both classes have about 1000 tweets (rows) each.
+```
+
+```{r visualizing data - flip and polar plots}
+bar <- ggplot(data = data) + 
+  geom_bar(
+    mapping = aes(x = class, fill = text), 
+    show.legend = FALSE,
+    width = 1
+  ) + 
+  theme(aspect.ratio = 1) +
+  labs(x = NULL, y = NULL)
+
+bar + coord_flip()
+bar + coord_polar()
+
+```
+
+# Data text mining
+
+## Text mining package
+In this section I dive into the actual text mining process. I begin by loading in a few packages first, such as the text mining library. Then, I start performing the deeper text data cleaning process. 
+
+In this process I perform different operations on my data using the tm package of r, such as removing punctuation, numbers and white spaces, converting all text to lowercase or remove English stopwords that is not insightful for our analysis such as "the", "a" or "and". I also remove all the necessary punctuation and all the characters that will difficult the classification later on such as hashtags, @ mention symbols, URLs, emojis, and so on. To conclude, I stem words using the Snowball stemming algorithm.
+
+```{r text mining tweet cleanup}
+library(NLP)
+library(tm)
+library(SnowballC)
+
+#I tried the following function to clean tweets but converts my data into character values and I'm not convinced about that.
+#clean_tweets <- function(x) {
+#                x %>%
+ #                       str_remove_all(" ?(f|ht)(tp)(s?)(://)(.*)[.|/](.*)") %>%
+  #                      str_replace_all("&amp;", "and") %>%
+   #                     str_remove_all("[[:punct:]]") %>%
+    #                    str_remove_all("^RT:? ") %>%
+     #                   str_remove_all("@[[:alnum:]]+") %>%
+      #                  str_remove_all("#[[:alnum:]]+") %>%
+       #                 str_replace_all("\\\n", " ") %>%
+        #                str_to_lower() %>%
+         #               str_trim("both")}
+#cdata2 <- cdata %>% clean_tweets
+
+data$text = tolower(data$text)  # Convert to lower case
+
+text = data$text                      
+text = removePunctuation(text)              # remove punctuation marks
+text = removeNumbers(text)                  # remove numbers
+text = stripWhitespace(text)                # remove blank space
+
+# remove URLs
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+text = removeURL(text)
+
+# remove anything other than English letters or space
+removeNumPunct <- function(x) gsub("[^[:alpha:][:space:]]*", "", x)
+text = removeNumPunct(text)
+
+# remove stopwords
+stopwords("english") # list of english stopwords
+
+text = removeWords(text,stopwords("english")) 
+text = stemDocument(text)
+
+cor = Corpus(VectorSource(text))            # Create text corpus
+cor
+inspect(cor[1:3]) #inspecting first three elements of the corpus
+
+
+#convert data to UTF #I didn't do this because it doesn't apply tpo my data
+#cdata <- iconv(data$text, "ASCII", "UTF-8", sub="")
+
+#cdata <- VCorpus(VectorSource(data),readerControl=list(language="en"))
+
+#I am not sure if this is the same but the following line (obtained from
+#tm textprocessing Tutorial of our course) is not working for me.
+
+#cdata = VCorpus(DirSource("twitterdata"),readerControl=list(language="en")
+
+
+```
+
+## Document-term matrix from corpus
+<!-- (9) -->
+In the following step I continue with our text mining process. In this case, I create a document-term matrix from a corpus, which will be later on used to apply machine learning modelization techniques such as classification, clustering and so on. Document Term Matrix can be considered as an implementation of the Bag of Words concept.
+
+After creating the document-term matrix from the corpus, I inspect the matrix and I use the "removeSparseTerms" function in order to remove the occurrences that appear very few times. This way, I obtain a smaller set of words that better represent the class or are more meaningful to it. However, the list of most common words we observe as a result is quite unexpected, which leads me to believe that some part of the process has been done in the wrong way.
+
+As we can observe in the results below, after applying a 0.9 sparsity value to my data matrix, I obtain a 50% level of sparsity and Non-/sparse entries are: 8825/8821.
+
+```{r text mining document-term matrix, results='asis'}
+
+cdata.dtm = DocumentTermMatrix(cor,               # Craete DTM
+                         control = list(weighting =             
+                                               function(x)
+                                                 weightTfIdf(x, normalize = F))) # IDF weighing
+
+dim(cdata.dtm)
+# inspecting a subset of the matrix
+inspect(cdata.dtm[12:15, 32:35])
+
+
+#15 most frequent terms for each class
+findFreqTerms(cdata.dtm,150) 
+findAssocs(cdata.dtm,term="young",corlimit=0.7)
+
+#Removing sparse terms
+cdata.dtm.60=removeSparseTerms(cdata.dtm,sparse=0.6)
+cdata.dtm.60 # or dim(cdata.dtm.70)
+
+# the term-document matrix needs to be transformed (casted)
+# to a matrix form in the following barplot command
+
+cdata.dtm.80=removeSparseTerms(cdata.dtm,sparse=0.8)
+cdata.dtm.80
+barplot(as.matrix(cdata.dtm.80),xlab="terms",ylab="number of occurrences", main="Most frequent terms (sparseness=0.8)")
+
+cdata.dtm.90=removeSparseTerms(cdata.dtm,sparse=0.90)
+cdata.dtm.90
+
+cdata.dtm.95=removeSparseTerms(cdata.dtm,sparse=0.95)
+
+cdata.dtm.96=removeSparseTerms(cdata.dtm,sparse=0.96)
+
+barplot(as.matrix(cdata.dtm.96),xlab="terms",ylab="number of occurrences", main="Most frequent terms (sparseness=0.96)")
+
+datamatrix <- cdata.dtm.95 
+typeof(datamatrix)  # what is it?
+length(datamatrix)  # how long is it? What about two dimensional objects?
+attributes(datamatrix)  # does it have any metadata?
+
+#cdata.dtm.50=removeSparseTerms(cdata.dtm,sparse=0.5) #Just trying things
+#cdata.dtm.65=removeSparseTerms(cdata.dtm,sparse=0.65)
+```
+
+### Converting matrix to file format of other softwares
+I did this part just a trial because I plan on continuing my analysis and classification process in R. However, it is good to see how it is done for future times.
+
+```{r matrix to other formats}
+#data=data.frame(as.matrix(cdata.dtm.90)) # convert corpus to dataFrame format
+#type=c(rep("immigration",1000),rep("climatechange",1000)) # create the type vector to be appended
+# install the package for apply the conversion function
+#install.packages("foreign")
+#library(foreign)
+#write.arff(cbind(data,type),file="term-document-matrix-weka-format.arff")
+```
+
+## More on data visualization: Wordcloud
+<!-- (9) -->
+Wordcloud is a nice visualization graph that shows the most frequent words and sorts them in descending order. However, there is some problem for which my data cannot fit into a wordcloud (something to do with the dimensions), so it cannot be displayed. 
+
+However, I did manage to obtain a clear list of the most frequent words. If we have a look at it, we can see that the words that show up are actually words that seem meaningful to the classes. For instance, words of this list like "cannadaimmigr, senatormendez, marsh(a)blackburn, biden, expressentri, claim, process y-axi(s)" can be related to immigration and other words like "documentari, global, clean, ecolog, climater" can be related to climate emergency. This means that the cleaning up and text mining process was not so unsuccessful after all. After observing I might be going on the right track with my text contents, I will simply move on with the clustering and classification process.
+
+```{r wordcloud, echo = TRUE, tidy = TRUE, results = 'asis'}
+#I also created a Term Document Matrix because I realized that, although I cannot perform sparseness filtering with it, it allows me to pre-visualize data in an easier way. I show a first wordcloud with the words at this point of the analysis. Later on, when I perform the sparseness removal process, I will show another wordcloud as well.
+cdata.tdm <- TermDocumentMatrix(cor)
+m <- as.matrix(cdata.tdm)
+v <- sort(rowSums(m),decreasing=TRUE)
+cdata.tdm <- data.frame(word = names(v),freq=v)
+head(cdata.tdm, 20)
+
+library(wordcloud)
+library(RColorBrewer)
+
+# calculate the frequency of words and sort in descending order.
+wordFreqs=sort(colSums(as.matrix(cdata.dtm.96)[1000:2000,]), decreasing=TRUE)
+wordcloud(words=names(wordFreqs),freq=wordFreqs)
+#This provides very little number of words, so I used a different system below.
+
+#draw the word cloud
+set.seed(1234)
+wordcloud(words = cdata.tdm$word, freq = cdata.tdm$freq, min.freq = 10,max.words=50, random.order=FALSE,scale = c(3, 0.5), colors = rainbow(50))
+
+```
+
+# Clustering and classification of data
+
+In this section I begin to work directly with data. I first cluster words with similar patterns of occurrences accross the dataset and then I classify it. 
+
+## Clustering of words
+
+Based on the guidance provided in the Machine Learning class tutorial, I try to find clusters of words with hierarchical clustering, which aims to build a dendogram to iteratively group pairs of similar objects. In order to do that, I use my latest object created in the previous subsection where I applied a 0.7 sparseness-value to my data matrix (named 'datamatrix'). However, the cluster Dendogram was too dense and it is difficult to observe specific instances of data. Therefore I followed the same system but with a 0.9 sparseness level.
+
+```{r clustering with two sparsity levels}
+
+distMatrix95=dist(t(scale(as.matrix(cdata.dtm.95))))
+termClustering95=hclust(distMatrix95,method="complete")
+plot(termClustering95)
+
+distMatrix96=dist(t(scale(as.matrix(cdata.dtm.96))))
+termClustering96=hclust(distMatrix96,method="complete")
+plot(termClustering96)
+
+```
+
+The initial hierarchical clustering dendogram displayed is a little dense so we cannot see much. It looks a bit sketchy so I keep working on it. I think the problem is probably that I did not cast correctly my data to a data-frame type. After several trials, marked in comments below, I could not find a way to fix the dendogram.
+
+```{r clustering}
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+
+distMatrix96=dist(t(scale(as.matrix(cdata.dtm.96))))
+distMatrix=dist(t(scale(as.matrix(cdata.dtm.95))))
+
+#Just checking how my data is to see what could have gone wrong:
+typeof(distMatrix)
+dim(distMatrix)
+typeof(cdata.dtm.95)
+dim(cdata.dtm.95)
+
+#Euclidean and hclust dendogram
+dd <- dist(scale(distMatrix96), method = "euclidean")
+hc <- hclust(dd, method = "ward.D2")
+plot(hc)
+
+#Euclidean dendogram
+eucl <- dist(distMatrix96, method="euclidean")
+plot(eucl)
+
+#Canberra dendogram
+canberra <- dist(distMatrix96, method="canberra") 
+canberra.ward = hclust(dist(canberra), method="ward.D2")
+plot(canberra.ward, hang = -1, main="")
+
+```
+
+## Classification
+
+I now proceed with the classification of the data. I try to learn a classifier model that will predict the class of future tweets based on my data. I use, as indicated in the guidelines, a term matrix that contains a 0.9 sparseness level. I fist append the class vector as the last column of the matrix.
+
+After the transformation of my data into a matrix I obtain a dimension matrix of 2000 and 2, that is, the number of tweets and classes, respectively. This new matrix is the starting point for my classification. I then concatenate the matrix and data frame casting operations.
+
+```{r matrix adaptation}
+type=c(rep("climateemergency",1000),rep("immigration",1000)) # create the type vector #This has been done already above.
+
+cdata.dtm.95=cbind(cdata.dtm.95,type) # append
+dim(cdata.dtm.95) # consult the updated number of columns
+dim(type)
+
+cdata.dtm.95.ML.matrix=as.data.frame(as.matrix(cdata.dtm.95))
+
+#updating last column to make it "type" class.
+colnames(cdata.dtm.95.ML.matrix)[20]="type"
+```
+
+### Caret 
+Caret can be used for supervised classification and regression model building. Therefore, I will try to preprocess my data using Caret and will then learn a classification model and obtain accuracy estimations and statistical comparisons between the performance of different models. 
+
+I first set a random seed to enable the reproducibility of this process. Then I create a partition data object to obtain a train-test partition of my total tweets. 
+```{r caret data partition}
+library(caret)
+set.seed(150) # a random seed to enable reproducibility
+
+inTrain <- createDataPartition(cdata.dtm.95.ML.matrix$type, p = .75, 
+                                  list = FALSE, 
+                                  times = 1)
+str(inTrain)
+training <- cdata.dtm.95.ML.matrix[inTrain,] #Creating training set, 75%
+testing <- cdata.dtm.95.ML.matrix[-inTrain,] #Creating test set, 25%
+nrow(training)
+
+```
+
+### Classification algorithms: class tutorial algorithms
+
+This part has started to be complex for me. I first try the two algorithms that we have seen in class to see if my data works well with those, which means that it's appropriately obtained. Later, I try to change the classification algorithms and obtain a prediction with my data. I have decided to use the Decision Tree and Naive Bayes classifiers.
+
+```{r class tutorial classification algorithms}
+#install.packages(pROC)
+library(pROC)
+
+#Testing my data with the algorithms from the in class tutorial
+#Performance estimation procedure
+ctrl <- trainControl(method = "repeatedcv",repeats=3)
+svmModel3x10cv <- train(type ~ ., data=training,method="svmLinear",trControl=ctrl)
+svmModel3x10cv
+knnModel3x10cv <- train(type ~ ., data=training,method="knn",trControl=ctrl)
+knnModel3x10cv
+
+#ROC
+ctrl <- trainControl(method = "repeatedcv",repeats=3, classProbs=TRUE,
+summaryFunction=twoClassSummary)
+knnModel3x10cvROC <- train (type ~ ., data=training,method="knn",trControl=ctrl,
+metric="ROC",tuneLength=10)
+knnModel3x10cvROC
+plot(knnModel3x10cvROC)
+
+#Predictions
+svmModelClasses <- predict(svmModel3x10cv, newdata = testing, type = "raw")
+#confusionMatrix(data=svmModelClasses,testing$type)
+
+#Resamples
+resamps=resamples(list(knn=knnModel3x10cv,svm=svmModel3x10cv))
+summary(resamps)
+xyplot(resamps,what="BlandAltman")
+diffs<-diff(resamps)
+summary(diffs)
+
+```
+### Classification algorithms: Decision Tree algorithm
+
+The model correctly predicted 250 "climate emergency" tweet types and classified 0 tweets incorrectly as "immigration typ". However, the model misclassified 2 tweets as "climate emergency" type while they turned out to be of "immigration" type. As we can see after conducting a confusion matrix analysis, the accuracy results of the model for the test set are of 0.996. In addition, I try to tune the hyperparameters for better prediction accurary but this did not work as it provided the same accuracy rates.
+
+
+```{r Decision Tree}
+#install.packages('randomForest')
+#install.packages('rpart')
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(klaR)
+
+
+#Decision Tree algorithm
+dectree <- rpart(type~., data = training, method = 'class')
+dectree
+rpart.plot(dectree, extra = 106)
+
+#Prediction
+predict_unseenDC <- predict(dectree, testing, type = 'class')
+table_pred <- table(testing$type, predict_unseenDC)
+table_pred
+
+#Confusion Matrix
+accuracy_Test <- sum(diag(table_pred)) / sum(table_pred)
+print(paste('Accuracy for test', accuracy_Test))
+
+#Tuning hyperparameters for better results
+accuracy_tune <- function(dectree) {
+    predict_unseenDC <- predict(dectree, testing, type = 'class')
+    table_pred <- table(testing$type, predict_unseenDC)
+    accuracy_Test <- sum(diag(table_pred)) / sum(table_pred)
+    accuracy_Test
+}
+
+control <- rpart.control(minsplit = 4,
+    minbucket = round(5 / 3),
+    maxdepth = 3,
+    cp = 0)
+tune_fit <- rpart(type~., data = training, method = 'class', control = control)
+accuracy_tune(tune_fit)
+
+```
+### Classification algorithms: Naive Bayes algorithm
+
+I now follow the same process above but this time using a Naive Bayes algorithm. As we can see in the confusion matrix, the results of the prediction are the same as with the Decision Tree algorithm. The model correctly predicted 250 "climate emergency" tweet types and classified 0 tweets incorrectly as "immigration typ". However, the model misclassified 2 tweets as "climate emergency" type while they turned out to be of "immigration" type. The other 248 "immigration" tweets were correctly classified.
+
+```{r Naive Bayes}
+library(e1071)
+
+#NaiveBayes algorithm
+NBclassfier=naiveBayes(as.factor(type)~., data=training)
+print(NBclassfier)
+
+#Train pred #I am only interested in test
+trainPred=predict(NBclassfier, newdata = training, type = "class")
+trainTable=table(training$type, trainPred)
+
+#Test pred
+TestPred=predict(NBclassfier, testing, type="class")
+
+#Confusion Matrix
+table(TestPred, testing$type,dnn=c("Prediction","Actual"))
+
+```
+# Conclusion
+
+In this project I have learned how to retrieve tweets directly from the Twitter app and convert them into datasets. In addition, I have learned how to clean and process this data by means of the tm R package and some other packages, as well as visualizing the data and obtaining different sparseness levels. To conclude, I have been able to try different ML classifying algorithms with my data, including Decision Tree and Naive Bayes algorithms, to then interpret results from prediction table matrix.
+
+Results make me think that the analysis might have some errors and that is why both algorithms are similar. I believe that the sparness level might have been too high, even if I tried to adjust in many times to control this. However, I would like to conclude the project by saying that, despite the errors, I believe this was a good introduction to how to work with data in R and perform some basic Machine Learning operations and algorithms.
+
