@@ -12,30 +12,6 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy = FALSE, warning = FALSE, error = FALSE, message = FALSE, collaspe = TRUE)
-
-#loadedNamespaces()
-
-#remove.packages("htmltools")
-#install.packages('htmltools')
-
-library(rtweet)
-library(tidyverse)
-library(tidytext)
-library(knitr)
-library(kableExtra)
-library(reshape2) 
-library(reshape) 
-library(stargazer)
-library(ggplot2)
-library(NLP)
-library(tm)
-library(SnowballC)
-library(wordcloud)
-library(RColorBrewer)
-library(cluster)    # clustering algorithms
-library(factoextra) # clustering visualization
-library(dendextend) # for comparing two dendrograms
-library(caret)
 ```
 
 
